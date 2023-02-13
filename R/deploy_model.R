@@ -54,11 +54,8 @@
 #'  values from 0-1. A lower number will produce more bboxes (it will be less
 #'  stringent in deciding to make a bbox). A higher number will produce fewer
 #'  bboxes (it will be more stringent).
-#' @param overlap_correction boolean. Should overlapping detections be
-#' evaluated for overlap and highest confidence detection be returned
-#' @param overlap_threshold Overlap threshold used when determining if bounding box
-#' detections are to be considered a single detection. Accepts values from 0-1
-#' representing the proportion of bounding box overlap.
+#' @param overlap_threshold Box overlap area threshold to determine if multiple bounding box
+#' detections are to be considered a single detection. Accepts values from 0-1; default = 0.5
 #' @param prediction_format The format to be used for the prediction file.  Accepts
 #' values of 'wide' or 'long'.
 #' @param latitude image location latitude. Use only if all images in the model run come from the same location.
@@ -77,7 +74,6 @@
 #'  
 #' @import torch
 #' @import torchvision
-#' @import torchvisionlib
 #' @import magick
 #' 
 #' @export
@@ -92,8 +88,7 @@ deploy_model <- function(
     output_dir = NULL,
     sample50 = FALSE, 
     write_bbox_csv = FALSE, 
-    overlap_correction = TRUE,
-    overlap_threshold = 0.9,
+    overlap_threshold = 0.5,
     score_threshold = 0.6,
     prediction_format = "long",
     latitude = NA,
@@ -302,7 +297,8 @@ deploy_model <- function(
         output <- suppressMessages({model(input)})
         options(warn = defaultW)
         
-        pred_df <- decode_output(output, label_encoder, 307, score_threshold)
+        # organize output, apply non-maximum suppression to filter overlapping predictions
+        pred_df <- decode_output(output, label_encoder, 307, overlap_threshold)
         
         # evaluate predictions using possible species
         if(is.null(location)==FALSE){
@@ -317,10 +313,10 @@ deploy_model <- function(
         if(nrow(pred_df) > 1) {
           pred_df$number_bboxes<-0
           
-          # address overlapping bboxes
-          if(overlap_correction){
-            pred_df <- reduce_overlapping_bboxes(pred_df, overlap_threshold)
-          }
+          # # address overlapping bboxes
+          # if(overlap_correction){
+          #   pred_df <- reduce_overlapping_bboxes(pred_df, overlap_threshold)
+          # }
         }
         # subset by score threshold for plotting
         pred_df_plot <- pred_df[pred_df$scores >= score_threshold, ]
@@ -415,7 +411,6 @@ deploy_model <- function(
     output_dir = normalizePath(output_dir),
     sample50 = sample50, 
     write_bbox_csv = write_bbox_csv, 
-    overlap_correction = overlap_correction,
     overlap_threshold = overlap_threshold,
     score_threshold = score_threshold,
     prediction_format = prediction_format,

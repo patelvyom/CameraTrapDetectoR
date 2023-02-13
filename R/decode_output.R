@@ -2,24 +2,32 @@
 #' to make plots and provide a csv with information
 #' 
 #' @param output this is a subset of the list output from the neural net
-#' @param score_threshold threshold score for keeping bounding boxes
+#' @param overlap_threshold threshold of overlap area of bounding boxes
 #' @param label_encoder passed from deploy model function
 #' @param h image height after resizing. Recommend not changing this
 #' @return converted output from model that can be interpreted in R
+#' 
+#' @import torchvisionlib
 #' 
 #' @export
 decode_output <- function(
     output, # this is the list output from the neural net
     label_encoder,
     h, 
-    score_threshold = 0.7
+    overlap_threshold = 0.5
 ){
-  # subset the output for the part we want
+  # subset the output
   preds <- output[[2]][[1]]
-  boxes <- as.matrix(preds$boxes)
-  img_labels <- as.matrix(preds$labels)
+  # boxes <- as.matrix(preds$boxes)
+  # img_labels <- as.matrix(preds$labels)
+  # scores <- as.matrix(preds$scores)
   
-  scores <- as.matrix(preds$scores)
+  # filter predictions through non-maximum suppression
+  # if box overlap area is greater than overlap_threshold, return only box with greater score
+  pred_ids <- as.matrix(torchvisionlib::ops_nms(preds$boxes, preds$scores, overlap_threshold))
+  boxes <- as.matrix(preds$boxes[pred_ids,])
+  img_labels <- as.matrix(preds$labels[pred_ids])
+  scores <- as.matrix(preds$scores[pred_ids])
   
   pred_df <- data.frame('boxes' = boxes,
                         'scores' = scores,
