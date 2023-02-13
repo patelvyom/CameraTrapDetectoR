@@ -298,7 +298,7 @@ deploy_model <- function(
         options(warn = defaultW)
         
         # organize output, apply non-maximum suppression to filter overlapping predictions
-        pred_df <- decode_output(output, label_encoder, 307, overlap_threshold)
+        pred_df <- decode_output(output, label_encoder, h, overlap_threshold)
         
         # evaluate predictions using possible species
         if(is.null(location)==FALSE){

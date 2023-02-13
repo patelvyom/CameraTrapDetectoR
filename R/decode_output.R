@@ -18,23 +18,32 @@ decode_output <- function(
 ){
   # subset the output
   preds <- output[[2]][[1]]
-  # boxes <- as.matrix(preds$boxes)
-  # img_labels <- as.matrix(preds$labels)
-  # scores <- as.matrix(preds$scores)
+  boxes <- as.matrix(preds$boxes)
+  img_labels <- as.matrix(preds$labels)
+  scores <- as.matrix(preds$scores)
   
   # filter predictions through non-maximum suppression
   # if box overlap area is greater than overlap_threshold, return only box with greater score
-  pred_ids <- as.matrix(torchvisionlib::ops_nms(preds$boxes, preds$scores, overlap_threshold))
-  boxes <- as.matrix(preds$boxes[pred_ids,])
-  img_labels <- as.matrix(preds$labels[pred_ids])
-  scores <- as.matrix(preds$scores[pred_ids])
+  pidx <- torchvisionlib::ops_nms(preds$boxes, preds$scores, overlap_threshold)
+  pred_ids <- as.matrix(pidx)
   
-  pred_df <- data.frame('boxes' = boxes,
-                        'scores' = scores,
-                        'label' = img_labels)
+  # filter all predictions by returned nms indices
+  # address empty predictions
+  if (length(pred_ids==0)){
+    boxes <- matrix(c(0, 0, 0, 0), nrow = 1)
+    img_labels <- matrix(0)
+    scores <- matrix(1)
+  }  else {
+    boxes <- boxes[pred_ids,]
+    img_labels <- img_labels[pred_ids]
+    scores <- scores[pred_ids]
+  }
+
+  # combine into df
+  pred_df <- data.frame(boxes, scores, img_labels)
   
   # assign column names
-  colnames(pred_df)[1:4] <- c('XMin', 'YMin', 'XMax', 'YMax')
+  colnames(pred_df) <- c('XMin', 'YMin', 'XMax', 'YMax', 'scores', 'label')
   
   # check to ensure YMax and YMin are returned as expected - if not then reorder columns
   if(all((h-pred_df$YMax - h-pred_df$YMin)<0)){
