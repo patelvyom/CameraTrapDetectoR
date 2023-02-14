@@ -11,7 +11,6 @@ RoxygenNote: 7.2.1
 Imports: 
     exifr,
     fs,
-    gargle,
     googledrive,
     magick,
     rappdirs,
@@ -29,3 +28,4 @@ Suggests:
 VignetteBuilder: knitr
 Depends: 
     R (>= 2.10)
+Config/testthat/edition: 3

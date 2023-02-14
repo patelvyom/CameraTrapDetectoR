@@ -8,6 +8,7 @@ download_cache(name = "weights_family_cpu.pth", redownload = TRUE)
 }
 \arguments{
 \item{name}{location of file to download}
+\item{redownload}{bool - whether or not to redownload model weights from online storage}
 }
 \description{
 This function will download files necessary to run the model and store them in the package space
