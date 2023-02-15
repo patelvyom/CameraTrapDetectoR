@@ -380,17 +380,11 @@ deploy_model <- function(
           
           # write prediction df to csv
           df_out <- write_output(full_df, prediction_format, label_encoder)
-          utils::write.csv(out_df, file.path(output_dir, 'model_predictions.csv'), row.names=FALSE)
-          
-<<<<<<< HEAD
-          # save checkpoint files to csv
+
           # save predictions to csv
-          utils::write.csv(out_df, file.path(output_dir, 'model_predictions.csv'), row.names=FALSE)
+          utils::write.csv(df_out, file.path(output_dir, 'model_predictions.csv'), row.names=FALSE)
           
           # if saving all bboxes, make df and save to csv
-=======
-          # write bbox df
->>>>>>> 31cae48967f31f45d928bf7171fba19b332cd599
           if(write_bbox_csv){
             bbox_df <- write_bbox_df(predictions_list, w, h)
             utils::write.csv(bbox_df, file.path(output_dir, "predicted_bboxes.csv"), row.names=FALSE)
