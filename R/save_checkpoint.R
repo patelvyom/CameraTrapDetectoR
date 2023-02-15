@@ -9,15 +9,7 @@
 #' @export
 save_checkpoint <- function(out_df, output_dir, write_bbox_csv) {
 
-  # save predictions to csv
-  utils::write.csv(out_df, file.path(output_dir, 'model_predictions.csv'), row.names=FALSE)
-  
-  # if saving all bboxes, make df and save to csv
-  # Write Bounding Box File
-  if(write_bbox_csv){
-    bbox_df <- write_bbox_df(predictions_list, w, h)
-    utils::write.csv(bbox_df, file.path(output_dir, "predicted_bboxes.csv"), row.names=FALSE)
-  }
+
   
   # END
 }
