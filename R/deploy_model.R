@@ -59,8 +59,7 @@
 #' @param overlap_threshold Overlap threshold used when determining if bounding box
 #' detections are to be considered a single detection. Accepts values from 0-1
 #' representing the proportion of bounding box overlap.
-#' @param prediction_format The format to be used for the prediction file.  Accepts
-#' values of 'wide' or 'long'.
+#' @param get_metadata boolean. Collect metadata for each image when it runs through the
 #' @param latitude image location latitude. Use only if all images in the model run come from the same location.
 #' @param longitude image location longitude. Use only if all images in the model run come from the same location.
 #' @param h The image height (in pixels) for the annotated plot. Only used if
@@ -95,7 +94,7 @@ deploy_model <- function(
     overlap_correction = TRUE,
     overlap_threshold = 0.9,
     score_threshold = 0.6,
-    prediction_format = "long",
+    get_metadata = TRUE,
     latitude = NULL,
     longitude = NULL,
     h=307,
@@ -134,13 +133,6 @@ deploy_model <- function(
   # test score_threshold
   if (score_threshold < 0 | score_threshold >= 1){
     stop("score_threshold must be between 0 and 1")
-  }
-  
-  # check prediction_format
-  formats <- c('wide', 'long')
-  if(!prediction_format %in% formats) {
-    stop(paste0("prediction_format must be one of the available options: ",
-                list(formats)))
   }
   
   # check location arguments
@@ -219,7 +211,7 @@ deploy_model <- function(
   #utils::install.packages(c("shiny", "shinyjs"))
   
   # load model 
-  cat("\nLoading model architecture and weights. If this is your first time deploying a model on this computer, this step can take a few minutes. \n")
+  cat("\nLoading model architecture and weights. If you are redownloading model weights on this computer, this step can take a few minutes. \n")
   model <- weightLoader(model_type, num_classes = nrow(label_encoder), redownload=redownload)
   model$eval()
   
@@ -233,7 +225,7 @@ deploy_model <- function(
   }
   
   # set placeholder for predicted bboxes
-  if(write_bbox_csv==TRUE){
+  if(write_bbox_csv){
     bboxes <- NULL
   }
   
@@ -290,7 +282,7 @@ deploy_model <- function(
     overlap_correction = overlap_correction,
     overlap_threshold = overlap_threshold,
     score_threshold = score_threshold,
-    prediction_format = prediction_format,
+    get_metadata = get_metadata,
     latitude = latitude,
     longitude = longitude,
     h=h,
@@ -309,8 +301,7 @@ deploy_model <- function(
   #-- Make dataframe of possible labels using species range data
   if (is.null(latitude) & is.null(longitude)) {
     location <- NULL
-  }
-  else {
+  } else {
     location <- data.frame(longitude=longitude, latitude=latitude)
   }
   
@@ -352,10 +343,10 @@ deploy_model <- function(
       if("error" %in% input){
         # set up output so that I can put into the data frame
         # get file name
-        filename <- file_list[i]
-        pred_df <- data.frame(label = 'image_error', XMin = NA, YMin = NA, XMax=NA, YMax=NA,
+        filename <- normalizePath(file_list[i], winslash = "/")
+        pred_df <- data.frame(label = 0, XMin = NA, YMin = NA, XMax=NA, YMax=NA,
                               scores = 1.0, label.y = 'image_error', number_bboxes = 0,
-                              'filename' = normalizePath(filename))
+                              'filename' = filename)
         predictions_list[[i]] <- pred_df
       } else {
         # deploy the model. suppressing warnings here, because it is not important
@@ -383,10 +374,13 @@ deploy_model <- function(
             pred_df <- reduce_overlapping_bboxes(pred_df, overlap_threshold)
           }
         }
+        # add filename
+        filename <- normalizePath(file_list[i], winslash = "/")
+        
         # subset by score threshold for plotting
         pred_df_plot <- pred_df[pred_df$scores >= score_threshold, ]
+        
         # make plots
-        filename <- file_list[i]
         if(make_plots){
           plot_img_bbox(filename, pred_df_plot, output_dir, data_dir, plot_label, col,
                         lty, lwd, FALSE, w, h)
@@ -408,8 +402,16 @@ deploy_model <- function(
           
         }
         
+        # add full filepath to prediction
+        pred_df$filename <- rep(filename, nrow(pred_df))
+        
+        # extract image metadata and add to predictions
+        if(get_metadata){
+          meta_df <- extract_metadata(filename)
+          pred_df <- dplyr::left_join(pred_df, meta_df, dplyr::join_by(filename == FilePath))
+        }
+        
         # add prediction df to list
-        pred_df$filename <- rep(normalizePath(filename), nrow(pred_df))
         predictions_list[[i]] <- pred_df
         
         # save results every 10th image
@@ -418,11 +420,11 @@ deploy_model <- function(
           full_df <- apply_score_threshold(predictions_list, score_threshold)
           
           # convert to output format
-          df_out <- write_output(full_df, prediction_format, label_encoder)
+          df_out <- write_output(full_df)
           
           # cat previous results if they exists
           if(exists("results")){
-            df_out <- unique(rbind(results, df_out))
+            df_out <- unique(dplyr::bind_rows(results, df_out))
           }
           
           # save predictions to csv
@@ -458,7 +460,7 @@ deploy_model <- function(
   full_df <- apply_score_threshold(predictions_list, score_threshold)
   
   # convert to output format
-  df_out <- write_output(full_df, prediction_format, label_encoder)
+  df_out <- write_output(full_df)
   
   # cat previous results if they exists
   if(exists("results")){
