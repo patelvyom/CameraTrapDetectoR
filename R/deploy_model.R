@@ -85,6 +85,8 @@
 #' @export
 deploy_model <- function(
     data_dir = NULL,
+    path2weights=NULL,
+    arch_path=NULL,
     model_type = 'species',
     recursive = TRUE,
     redownload = FALSE,
@@ -276,7 +278,7 @@ deploy_model <- function(
     current_time <- paste0("_", datenow, "_", sprintf("%02d", now$hour), 
                            sprintf("%02d", now$min), 
                            sprintf("%02d", round(now$sec)))
-    output_dir <- file.path(data_dir, paste0("predictions_", model_type, current_time))
+    output_dir <- file.path(data_dir, paste0("test_predictions_", model_type, current_time))
   } 
   if (!dir.exists(output_dir)){
     dir.create(output_dir)
@@ -432,13 +434,13 @@ deploy_model <- function(
           }
           
           # save predictions to csv
-          utils::write.csv(df_out, file.path(output_dir, paste(model_type, 'model_predictions.csv', sep="_")), row.names=FALSE)
+          utils::write.csv(df_out, file.path(output_dir, paste(model_type, 'test_model_predictions.csv', sep="_")), row.names=FALSE)
           
           # if saving all bboxes, make df and save to csv
           # Write Bounding Box File
           if(write_bbox_csv){
             bbox_df <- write_bbox_df(predictions_list, w, h, bboxes)
-            utils::write.csv(bbox_df, file.path(output_dir, paste(model_type, "predicted_bboxes.csv", sep="_")), row.names=FALSE)
+            utils::write.csv(bbox_df, file.path(output_dir, paste(model_type, "test_predicted_bboxes.csv", sep="_")), row.names=FALSE)
           }
           # print update
           cat(paste0("\nResults saved for ", i, " images.\n"))
@@ -472,19 +474,19 @@ deploy_model <- function(
   }
   
   # save predictions to csv
-  utils::write.csv(df_out, file.path(output_dir, paste(model_type, 'model_predictions.csv', sep="_")), row.names=FALSE)
+  utils::write.csv(df_out, file.path(output_dir, paste(model_type, 'test_model_predictions.csv', sep="_")), row.names=FALSE)
 
   
   cat(paste0("\nOutput can be found at: \n", normalizePath(output_dir), "\n",
-             "The number of animals predicted in each category in each image is in the file: ", model_type, "_model_predictions.csv\n"))
+             "The number of animals predicted in each category in each image is in the file: ", model_type, "test_model_predictions.csv\n"))
   
   
   # if saving all bboxes, make df and save to csv
   # Write Bounding Box File
   if(write_bbox_csv){
     bbox_df <- write_bbox_df(predictions_list, w, h, bboxes)
-    utils::write.csv(bbox_df, file.path(output_dir, paste(model_type, "predicted_bboxes.csv", sep="_")), row.names=FALSE)
-    cat(paste0("The coordinates of predicted bounding boxes are in the file: ", model_type,  "_predicted_bboxes.csv"))
+    utils::write.csv(bbox_df, file.path(output_dir, paste(model_type, "test_predicted_bboxes.csv", sep="_")), row.names=FALSE)
+    cat(paste0("The coordinates of predicted bounding boxes are in the file: ", model_type,  "test_predicted_bboxes.csv"))
   }
   
   
