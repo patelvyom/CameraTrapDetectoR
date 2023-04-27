@@ -59,7 +59,7 @@
 #' @param overlap_threshold Overlap threshold used when determining if bounding box
 #' detections are to be considered a single detection. Accepts values from 0-1
 #' representing the proportion of bounding box overlap.
-#' @param get_metadata boolean. Collect metadata for each image when it runs through the
+#' @param get_metadata boolean. Collect metadata for each image.
 #' @param latitude image location latitude. Use only if all images in the model run come from the same location.
 #' @param longitude image location longitude. Use only if all images in the model run come from the same location.
 #' @param h The image height (in pixels) for the annotated plot. Only used if
@@ -85,7 +85,7 @@ deploy_model <- function(
     model_type = 'general',
     recursive = TRUE,
     redownload = TRUE,
-    file_extensions = c(".jpg", ".JPG"),
+    file_extensions = c(".jpg"),
     make_plots = TRUE,
     plot_label = TRUE,
     output_dir = NULL,
@@ -95,8 +95,8 @@ deploy_model <- function(
     overlap_threshold = 0.9,
     score_threshold = 0.6,
     get_metadata = TRUE,
-    latitude = NULL,
-    longitude = NULL,
+    latitude = NA,
+    longitude = NA,
     h=307,
     w=408,
     lty=1,
@@ -136,22 +136,22 @@ deploy_model <- function(
   }
   
   # check location arguments
-  if (!is.null(latitude)) {
+  if (!is.na(latitude)) {
     if (latitude < -90 | latitude > 90){
       stop("latitude must be between -90 and 90")
     } 
   }
-  if (!is.null(longitude)) {
+  if (!is.na(longitude)) {
     if (longitude < -180 | latitude > 180) {
       stop("longitude must be between -180 and 180")
     }
   }
-  if (is.null(latitude) & !is.null(longitude)){
-    stop("invalid location; please include both latitude and longitude or leave both as NULL")
+  if (is.na(latitude) & !is.na(longitude)){
+    stop("invalid location; please include both latitude and longitude or leave both blank")
   }
   
-  if (!is.null(latitude) & is.null(longitude)){
-    stop("invalid location; please include both latitude and longitude or leave both as NULL")
+  if (!is.na(latitude) & is.na(longitude)){
+    stop("invalid location; please include both latitude and longitude or leave both blank")
   }
   
   # test lty 
@@ -299,7 +299,7 @@ deploy_model <- function(
   
   
   #-- Make dataframe of possible labels using species range data
-  if (is.null(latitude) & is.null(longitude)) {
+  if (is.na(latitude) & is.na(longitude)) {
     location <- NULL
   } else {
     location <- data.frame(longitude=longitude, latitude=latitude)
@@ -359,7 +359,7 @@ deploy_model <- function(
         # evaluate predictions using possible species
         if(is.null(location)==FALSE){
           pred_df<-smart_relabel(pred_df, possible.labels, label_encoder)
-          pred_df<-pred_df[pred_df$label.y %in% possible.labels$label,]
+          pred_df<-pred_df[pred_df$prediction %in% possible.labels$label,]
         }
         
         if(nrow(pred_df)==1){
@@ -389,27 +389,23 @@ deploy_model <- function(
         # when there is no predicted bounding box, create a relevant pred_df
         # first get the encoder value for the background class. This should always be zero
         if(nrow(pred_df) < 1) {
-          background_encoder <- label_encoder[which("empty"%in%label_encoder$label),]$encoder
-          pred_df[1,] <- c(0, # using 0 instead of background_encoder, because empty will always be 0
-                           rep(NA, (ncol(pred_df)-2)),
-                           "empty")
+          #background_encoder <- label_encoder[which("empty"%in%label_encoder$label),]$encoder
+          # pred_df[1,] <- c(0, # using 0 instead of background_encoder, because empty will always be 0
+          #                  rep(NA, (ncol(pred_df)-2)),
+          #                  "empty")
+          pred_df <- data.frame(label = 0, XMin = 0, YMin = 0, XMax = 0, YMax = 0,
+                                prediction = "empty", number_bboxes = 0, scores = 1)
           
-          # add column for number of bboxes
-          pred_df$number_bboxes<-0
-          
-          # add value for scores to address NA logical issues later
-          pred_df$scores<-1.0
+          # # add column for number of bboxes
+          # pred_df$number_bboxes<-0
+          # 
+          # # add value for scores to address NA logical issues later
+          # pred_df$scores<-1.0
           
         }
         
         # add full filepath to prediction
         pred_df$filename <- rep(filename, nrow(pred_df))
-        
-        # extract image metadata and add to predictions
-        if(get_metadata){
-          meta_df <- extract_metadata(filename)
-          pred_df <- dplyr::left_join(pred_df, meta_df, dplyr::join_by(filename == FilePath))
-        }
         
         # add prediction df to list
         predictions_list[[i]] <- pred_df
@@ -427,15 +423,31 @@ deploy_model <- function(
             df_out <- unique(dplyr::bind_rows(results, df_out))
           }
           
-          # save predictions to csv
-          utils::write.csv(df_out, file.path(output_dir, paste(model_type, 'model_predictions.csv', sep="_")), row.names=FALSE)
-          
           # if saving all bboxes, make df and save to csv
           # Write Bounding Box File
           if(write_bbox_csv){
-            bbox_df <- write_bbox_df(predictions_list, w, h, bboxes)
-            utils::write.csv(bbox_df, file.path(output_dir, paste(model_type, "predicted_bboxes.csv", sep="_")), row.names=FALSE)
+            bbox_df <- write_bbox_df(predictions_list, w, h, bboxes, score_threshold)
+            utils::write.csv(bbox_df, file.path(output_dir, paste(model_type, "predicted_bboxes.csv", sep="_")), 
+                             row.names=FALSE)
           }
+          
+          # extract metadata if requested
+          if(get_metadata){
+            meta_df <- extract_metadata(df_out$filename)
+            # remove all NA columns
+            meta_df <- remove_na(meta_df)
+            #utils::write.csv(meta_df, file.path(output_dir, "metadata.csv"), row.names = FALSE)
+            # join metadata to results
+            df_out <- dplyr::left_join(df_out, meta_df, 
+                                       dplyr::join_by(filename == FilePath), 
+                                       suffix = c("", ".y"), keep=FALSE)
+            # remove duplicates
+            df_out <- dplyr::select(df_out, -ends_with(".y"))
+          }
+          
+          # save predictions to csv
+          utils::write.csv(df_out, file.path(output_dir, paste(model_type, 'model_predictions.csv', sep="_")), row.names=FALSE)
+          
           # print update
           cat(paste0("\nResults saved for ", i, " images.\n"))
         }
@@ -462,9 +474,24 @@ deploy_model <- function(
   # convert to output format
   df_out <- write_output(full_df)
   
+  # extract and join metadata if requested
+  if(get_metadata){
+    # extract metadata
+    meta_df <- extract_metadata(df_out$filename)
+    # remove all NA columns
+    meta_df <- remove_na(meta_df)
+    # join metadata to results
+    df_out <- dplyr::left_join(df_out, meta_df, 
+                               dplyr::join_by(filename == FilePath), 
+                               suffix = c("", ".y"), keep=FALSE)
+    # remove duplicate columns
+    df_out <- dplyr::select(df_out, -ends_with(".y"))
+    
+  }
+  
   # cat previous results if they exists
   if(exists("results")){
-    df_out <- unique(rbind(results, df_out))
+    df_out <- unique(dplyr::bind_rows(results, df_out))
   }
   
   # save predictions to csv
@@ -478,7 +505,7 @@ deploy_model <- function(
   # if saving all bboxes, make df and save to csv
   # Write Bounding Box File
   if(write_bbox_csv){
-    bbox_df <- write_bbox_df(predictions_list, w, h, bboxes)
+    bbox_df <- write_bbox_df(predictions_list, w, h, bboxes, score_threshold)
     utils::write.csv(bbox_df, file.path(output_dir, paste(model_type, "predicted_bboxes.csv", sep="_")), row.names=FALSE)
     cat(paste0("The coordinates of predicted bounding boxes are in the file: ", model_type,  "_predicted_bboxes.csv"))
   }

@@ -2,7 +2,7 @@
 #' 
 #' @details Finalize model predictions in df and csv output
 #' 
-#' @param full_df df filtered by score_threshold
+#' @param full_df predictions list filtered by score_threshold
 #' 
 #' @export
 write_output <- function(full_df) {
@@ -48,8 +48,11 @@ write_output <- function(full_df) {
   # assign zero to counts if empty
   full_df_cnt[full_df_cnt$prediction=="empty","count"]<-0
   
+  # reorder rows by image name, predicted class
   df_out <-full_df_cnt[order(full_df_cnt$filename,full_df_cnt$prediction),]
   
+  # reorder columns
+  df_out <- dplyr::relocate(df_out, c("filename", "prediction", "confidence_in_pred", "count", "certainty"))
   
   # return data frame
   return(df_out)
