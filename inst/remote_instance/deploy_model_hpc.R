@@ -1,6 +1,6 @@
 # -- Template script to run CameraTrapDetectoR on a high performance computing system
 # -- Author: Amira Burns
-# -- Last Updated: 21 Feb 2023
+# -- Last Updated: 9 May 2023
 
 
 # Install and load CameraTrapDetectoR if it's not already installed
@@ -19,7 +19,7 @@ suppressPackageStartupMessages(library("argparse"))
 
 # create parser object
 parser <- ArgumentParser(description = "Run CameraTrapDetectoR on command line")
-out
+
 # add argument options for deploy_model function
 parser$add_argument("-v", "--verbose", action="store_true", default=TRUE,
                     help="Print extra output [default]")
@@ -56,11 +56,9 @@ parser$add_argument("--overlap_threshold", type='double', default=0.9,
 parser$add_argument("--score_threshold", type='double', default=0.6,
                     help="Confidence threshold for returning predictions.
                     Accepts values 0-1")
-parser$add_argument("--prediction_format", type='character', default='long',
-                    help='format for prediction results. Accepts values `wide`, `long`.')
-parser$add_argument("--latitude", help="Image location latitude. Use only if all images in 
+parser$add_argument("--latitude", default=NA, help="Image location latitude. Use only if all images in 
                     `data_dir` come from the same location.")
-parser$add_argument("--longitude", help="Image location longitude. 
+parser$add_argument("--longitude", default=NA, help="Image location longitude. 
                     Use only if all images in `data_dir` come from the same location.")
 parser$add_argument("--height", type='integer', default=307,
                     help="Image height in pixels for annotated plot")
@@ -94,7 +92,6 @@ dat <- deploy_model(
   overlap_correction = args$overlap_correction,
   overlap_threshold = args$overlap_threshold,
   score_threshold = args$score_threshold,
-  prediction_format = args$prediction_format,
   latitude = args$latitude,
   longitude = args$longitude,
   h=args$height,
